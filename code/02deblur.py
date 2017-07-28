@@ -14,8 +14,12 @@
 ### Import packages
 ################################################################################
 
+from Bio import SeqIO
+import biom
 import os
+import pandas as pd
 import subprocess
+
 
 #%%#############################################################################
 ### Define folder structure
@@ -44,3 +48,34 @@ if not os.path.exists(outputDir):
 
 deblurCommand = 'deblur workflow --seqs-fp '+qcDir+'/2008 --output-dir '+outputDir+' --trim-length '+str(minLength)+' --overwrite --min-reads 1 --min-size 1 --threads-per-sample 1'
 subprocess.call(deblurCommand, shell=True)
+
+#%%#############################################################################
+### Convert BIOM file to a human-readable OTU table
+################################################################################
+
+# Read in the BIOM table
+otuTable = biom.load_table(outputDir+'/all.biom')
+
+# Convert to a TSV
+otuTableString = otuTable.to_tsv() # returns a string
+with open(outputDir+'/otuTable.tsv', 'w') as outFile:
+    outFile.write(otuTableString)
+
+# Read back into a pandas dataframe and reindex
+otuDF = pd.read_csv(outputDir+'/otuTable.tsv', sep='\t', skiprows=1)
+index = list(range(1, len(otuDF)+1)) # Create an index
+index = [str(seqInt).zfill(6) for seqInt in index] # Convert to strings of equal length
+otuDF['IndexCol'] = index
+otuDF.index = otuDF['IndexCol'] 
+otuDF = otuDF.drop(labels=['#OTU ID', 'IndexCol'], axis =1)
+otuDF.to_csv(outputDir+'/otuTable.csv')
+os.remove(outputDir+'/otuTable.tsv')
+
+# Also update the FASTA file, replacing sequence strings with the appropriate numeric ID
+seqInt = 1
+with open(outputDir+'/all.seqs.numIDs.fasta', 'w') as outFile:
+    for seqRecord in SeqIO.parse(outputDir+'/all.seqs.fa', 'fasta'):
+        seqRecord.id = str(seqInt).zfill(6)
+        outFile.write('>'+seqRecord.id+'\n')
+        outFile.write(str(seqRecord.seq)+'\n')
+        seqInt += 1
