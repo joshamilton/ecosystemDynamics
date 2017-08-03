@@ -20,15 +20,14 @@ import os
 import pandas as pd
 import subprocess
 
-
 #%%#############################################################################
 ### Define folder structure
 ################################################################################
 
 qcDir = '../data/demultiplexedAndQCd' # demultiplexed and QCd fasta files
-outputDir = '../data/deblur'
+outputDir = '../results/deblur'
 
-minLength = 114 # trim sequences to this length
+minLength = 150 # trim sequences to this length
 
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
@@ -38,7 +37,7 @@ if not os.path.exists(outputDir):
 ################################################################################
 
 # Call deblur with the following options
-#  deblur workflow --seqs-fp ../data/demultiplexedAndQCd/2008
+#  deblur workflow --seqs-fp ../data/demultiplexedAndQCd
 #  --output-dir ../data/deblur/
 #  --trim-length 114
 #  --overwrite
@@ -46,7 +45,7 @@ if not os.path.exists(outputDir):
 #  --min-size 1
 #  --threads-per-sample 1
 
-deblurCommand = 'deblur workflow --seqs-fp '+qcDir+'/2008 --output-dir '+outputDir+' --trim-length '+str(minLength)+' --overwrite --min-reads 1 --min-size 1 --threads-per-sample 1'
+deblurCommand = 'deblur workflow --seqs-fp '+qcDir+' --output-dir '+outputDir+' --trim-length '+str(minLength)+' --overwrite --min-reads 1 --min-size 1 --threads-per-sample 1'
 subprocess.call(deblurCommand, shell=True)
 
 #%%#############################################################################
