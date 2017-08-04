@@ -52,8 +52,8 @@ excludeList = [sample.strip() for sample in excludeList]
 #  --min-size 1
 #  --threads-per-sample 1
 
-#deblurCommand = 'deblur workflow --seqs-fp '+qcDir+' --output-dir '+outputDir+' --trim-length '+str(minLength)+' --overwrite --min-reads 1 --min-size 1 --threads-per-sample 1'
-#subprocess.call(deblurCommand, shell=True)
+deblurCommand = 'deblur workflow --seqs-fp '+qcDir+' --output-dir '+outputDir+' --trim-length '+str(minLength)+' --overwrite --min-reads 1 --min-size 1 --threads-per-sample 1'
+subprocess.call(deblurCommand, shell=True)
 
 #%%#############################################################################
 ### Convert BIOM file to a human-readable OTU table
