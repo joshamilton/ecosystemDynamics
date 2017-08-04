@@ -17,7 +17,9 @@
 ### Import packages
 ################################################################################
 
+import numpy as np
 import pandas as pd
+import re
 
 #%%#############################################################################
 ### Define folder structure
@@ -33,7 +35,7 @@ deblurDir = '../results/deblur' # BIOM file from deblurring
 otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
 
 # Compute counts to frequencies
-freqTable = otuTable / otuTable.sum(axis=0)
+relAbundTable = otuTable / otuTable.sum(axis=0)
 
 #%%#############################################################################
 ### Taken together, the previous analyses suggest that a relative abundance
@@ -46,15 +48,51 @@ freqTable = otuTable / otuTable.sum(axis=0)
 ## Absolute abundances
 # Replace all relative abundances below the threshhold and drop all-0 rows
 simpleOtuTable = otuTable.copy()
-simpleOtuTable[freqTable < 0.001] = 0
+simpleOtuTable[relAbundTable < 0.001] = 0
 simpleOtuTable = simpleOtuTable.loc[~(simpleOtuTable==0).all(axis=1)]
 
 ## Relative abundances
 # Replace all relative abundances below the threshhold and drop all-0 rows
-simpleFreqTable = freqTable.copy()
-simpleFreqTable[simpleFreqTable < 0.001] = 0
-simpleFreqTable = simpleFreqTable.loc[~(simpleFreqTable==0).all(axis=1)]
+simpleRelAbundTable = relAbundTable.copy()
+simpleRelAbundTable[simpleRelAbundTable < 0.001] = 0
+simpleRelAbundTable = simpleRelAbundTable.loc[~(simpleRelAbundTable==0).all(axis=1)]
 
 # Write to file
 simpleOtuTable.to_csv(deblurDir+'/simpleOtuTable.csv')
-simpleFreqTable.to_csv(deblurDir+'/simpleFreqTable.csv')
+simpleRelAbundTable.to_csv(deblurDir+'/simpleRelAbundTable.csv')
+
+#%%#############################################################################
+### Taken together, the previous analyses suggest that a relative abundance
+### threshold of  0.001 will capture > 90% of the total sequences. Around 10% 
+### of all sequence variants account for this 90%.
+###
+### Also compute a table of average relative abundances
+################################################################################
+
+# Import table and sort
+otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
+otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
+
+# Drop samples for which one or more replicates failed during deblurring
+# Hopefully this step is temporary
+excludeList = ['TBE02AUG07.R2', 'TBE16JUL07.R2', 'TBE29OCT07.R2']
+otuTable = otuTable.drop(excludeList, axis=1)
+
+# Compute counts to relative abundances
+avgRelAbundTable = otuTable / otuTable.sum(axis=0)
+
+# Compute average for each sample (every 2 columns)
+avgRelAbundTable = avgRelAbundTable.groupby(np.arange(len(avgRelAbundTable.columns))//2, axis=1).mean()
+
+# Retrive the list of sample names and remove the '.R2'
+sampleNames = list(otuTable.columns[::2])
+sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
+avgRelAbundTable.columns = sampleNames
+
+# Simplify average relative abundances
+simpleAvgRelAbundTable = avgRelAbundTable.copy()
+simpleAvgRelAbundTable[simpleAvgRelAbundTable < 0.001] = 0
+simpleAvgRelAbundTable = simpleAvgRelAbundTable.loc[~(simpleAvgRelAbundTable==0).all(axis=1)]
+
+# Write to file
+simpleAvgRelAbundTable.to_csv(deblurDir+'/simpleAvgRelAbundTable.csv')
