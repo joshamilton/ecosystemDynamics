@@ -26,7 +26,7 @@ import pandas as pd
 ### Define folder structure
 ################################################################################
 
-deblurDir = '../data/deblur' # BIOM file from deblurring
+deblurDir = '../results/deblur' # BIOM file from deblurring
 
 #%%#############################################################################
 ### Import otu table and visualize frequency distribution
@@ -51,7 +51,6 @@ ax1.set_ylabel('% Total OTUs')
 plt.savefig(deblurDir+'/Total OTUs vs. Abundance.png')
 
 #%%#############################################################################
-### This plot suggests there are no unusually abundant or unusally infrequent taxa
 ### Now let's plot the fraction of total abundance in each bin
 ################################################################################
 
@@ -74,27 +73,3 @@ fig2 = plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge
 ax2.set_xlabel('Log10 relative abundance of OTU')
 ax2.set_ylabel('% Total Sequences')
 plt.savefig(deblurDir+'/Total Sequences vs. Abundance.png')
-
-#%%#############################################################################
-### Taken together, these data suggest that a relative abundance threshold of 
-### 0.001 will capture > 90% of the total sequences. Around 10% of all sequence
-### variants account for this 90%.
-###
-### Let's simplify the OTU table and write to file
-################################################################################
-
-## Absolute abundances
-# Replace all relative abundances below the threshhold and drop all-0 rows
-simpleOtuTable = otuTable.copy()
-simpleOtuTable[freqTable < 0.001] = 0
-simpleOtuTable = simpleOtuTable.loc[~(simpleOtuTable==0).all(axis=1)]
-
-## Relative abundances
-# Replace all relative abundances below the threshhold and drop all-0 rows
-simpleFreqTable = freqTable.copy()
-simpleFreqTable[simpleFreqTable < 0.001] = 0
-simpleFreqTable = simpleFreqTable.loc[~(simpleFreqTable==0).all(axis=1)]
-
-# Write to file
-simpleOtuTable.to_csv(deblurDir+'/simpleOtuTable.csv')
-simpleFreqTable.to_csv(deblurDir+'/simpleFreqTable.csv')
