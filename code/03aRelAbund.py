@@ -29,23 +29,23 @@ import pandas as pd
 deblurDir = '../results/deblur' # BIOM file from deblurring
 
 #%%#############################################################################
-### Import otu table and visualize frequency distribution
+### Import otu table and visualize distribution of relative abundances
 ################################################################################
 
 # Import table
 otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
 
 # Compute counts to frequencies
-freqTable = otuTable / otuTable.sum(axis=0)
+relAbundTable = otuTable / otuTable.sum(axis=0)
 
 # Convert to a single series and remove 0 values
-freqSeries = freqTable.unstack()
-freqSeries = freqSeries[freqSeries!=0]
+relAbundSeries = relAbundTable.unstack()
+relAbundSeries = relAbundSeries[relAbundSeries!=0]
 
 # Convert to log10 and plot a histogram with integer bin size
-logSeries = np.log10(freqSeries)
+logRelAbundSeries = np.log10(relAbundSeries)
 fig1, ax1 = plt.subplots()
-fig1 = plt.hist(logSeries, bins = range(math.floor(logSeries.min()), math.ceil(logSeries.max())+1), normed=True)
+fig1 = plt.hist(logRelAbundSeries, bins = range(math.floor(logRelAbundSeries.min()), math.ceil(logRelAbundSeries.max())+1), normed=True)
 ax1.set_xlabel('Log10 relative abundance of OTU')
 ax1.set_ylabel('% Total OTUs')
 plt.savefig(deblurDir+'/Total OTUs vs. Abundance.png')
@@ -56,16 +56,16 @@ plt.savefig(deblurDir+'/Total OTUs vs. Abundance.png')
 
 # Create a dataframe showing the % total abundance accounted for by each OTU in each sample
 
-freqAbundTable  = pd.DataFrame(data=0, index=logSeries.index, columns=['Log Rel Abund', 'Total Seqs'])
-freqAbundTable['Log Rel Abund'] = logSeries
-freqAbundTable['Total Seqs'] = otuTable.unstack()
-freqAbundTable['% Total Seqs'] = freqAbundTable['Total Seqs'] / freqAbundTable['Total Seqs'].sum(axis=0)
+logRelAbundSeriesTable  = pd.DataFrame(data=0, index=logRelAbundSeries.index, columns=['Log Rel Abund', 'Total Seqs'])
+logRelAbundSeriesTable['Log Rel Abund'] = logRelAbundSeries
+logRelAbundSeriesTable['Total Seqs'] = otuTable.unstack()
+logRelAbundSeriesTable['% Total Seqs'] = logRelAbundSeriesTable['Total Seqs'] / logRelAbundSeriesTable['Total Seqs'].sum(axis=0)
 
 # Use these data do calculate the fraction of sequences within each relative abundance window
-histTotalSeqDF = pd.DataFrame(data=0, index = range(math.floor(logSeries.min()), math.ceil(logSeries.max())), columns=['% Total Seqs'])
+histTotalSeqDF = pd.DataFrame(data=0, index = range(math.floor(logRelAbundSeries.min()), math.ceil(logRelAbundSeries.max())), columns=['% Total Seqs'])
 
 for floor in histTotalSeqDF.index:
-    histTotalSeqDF.loc[floor] = freqAbundTable[(freqAbundTable['Log Rel Abund'] >= floor) & (freqAbundTable['Log Rel Abund'] < floor+1)]['% Total Seqs'].sum()
+    histTotalSeqDF.loc[floor] = logRelAbundSeriesTable[(logRelAbundSeriesTable['Log Rel Abund'] >= floor) & (logRelAbundSeriesTable['Log Rel Abund'] < floor+1)]['% Total Seqs'].sum()
 
 # Plot as a bar chart
 fig2, ax2 = plt.subplots()
