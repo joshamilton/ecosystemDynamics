@@ -45,10 +45,10 @@ relAbundSeries = relAbundSeries[relAbundSeries!=0]
 
 # Convert to log10 and plot a histogram with integer bin size
 logRelAbundSeries = np.log10(relAbundSeries)
-fig1, ax1 = plt.subplots()
-fig1 = plt.hist(logRelAbundSeries, bins = range(math.floor(logRelAbundSeries.min()), math.ceil(logRelAbundSeries.max())+1), normed=True)
-ax1.set_xlabel('Log10 relative abundance of OTU')
-ax1.set_ylabel('% Total OTUs')
+plt.figure(0)
+plt.hist(logRelAbundSeries, bins = range(math.floor(logRelAbundSeries.min()), math.ceil(logRelAbundSeries.max())+1), normed=True)
+plt.xlabel('Log10 relative abundance of OTU')
+plt.ylabel('% Total OTUs')
 plt.savefig(deblurDir+'/Total OTUs vs. Abundance.png')
 
 #%%#############################################################################
@@ -76,10 +76,10 @@ avgRelAbundSeries = avgRelAbundSeries[avgRelAbundSeries!=0]
 
 # Convert to log10 and plot a histogram with integer bin size
 logAvgRelAbundSeries = np.log10(avgRelAbundSeries)
-fig1, ax1 = plt.subplots()
-fig1 = plt.hist(logAvgRelAbundSeries, bins = range(math.floor(logAvgRelAbundSeries.min()), math.ceil(logAvgRelAbundSeries.max())+1), normed=True)
-ax1.set_xlabel('Log10 average relative abundance of OTU')
-ax1.set_ylabel('% Total OTUs')
+plt.figure(1)
+plt.hist(logAvgRelAbundSeries, bins = range(math.floor(logAvgRelAbundSeries.min()), math.ceil(logAvgRelAbundSeries.max())+1), normed=True)
+plt.xlabel('Log10 average relative abundance of OTU')
+plt.ylabel('% Total OTUs')
 plt.savefig(deblurDir+'/Total OTUs vs. Average Abundance.png')
 
 #%%#############################################################################
@@ -100,10 +100,10 @@ for floor in histTotalSeqDF.index:
     histTotalSeqDF.loc[floor] = logRelAbundSeriesTable[(logRelAbundSeriesTable['Log Rel Abund'] >= floor) & (logRelAbundSeriesTable['Log Rel Abund'] < floor+1)]['% Total Seqs'].sum()
 
 # Plot as a bar chart
-fig2, ax2 = plt.subplots()
-fig2 = plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge')
-ax2.set_xlabel('Log10 relative abundance of OTU')
-ax2.set_ylabel('% Total Sequences')
+plt.figure(2)
+plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge')
+plt.xlabel('Log10 relative abundance of OTU')
+plt.ylabel('% Total Sequences')
 plt.savefig(deblurDir+'/Total Sequences vs. Abundance.png')
 
 #%%#############################################################################
@@ -129,8 +129,8 @@ for floor in histTotalSeqDF.index:
     histTotalSeqDF.loc[floor] = logAvgRelAbundSeriesTable[(logAvgRelAbundSeriesTable['Log Rel Abund'] >= floor) & (logAvgRelAbundSeriesTable['Log Rel Abund'] < floor+1)]['% Total Seqs'].sum()
 
 # Plot as a bar chart
-fig2, ax2 = plt.subplots()
-fig2 = plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge')
-ax2.set_xlabel('Log10 average relative abundance of OTU')
-ax2.set_ylabel('% Total Sequences')
+plt.figure(3)
+plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge')
+plt.xlabel('Log10 average relative abundance of OTU')
+plt.ylabel('% Total Sequences')
 plt.savefig(deblurDir+'/Total Sequences vs. Average Abundance.png')
