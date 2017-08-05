@@ -73,11 +73,6 @@ simpleRelAbundTable.to_csv(deblurDir+'/simpleRelAbundTable.csv')
 otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
 otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
 
-# Drop samples for which one or more replicates failed during deblurring
-# Hopefully this step is temporary
-excludeList = ['TBE02AUG07.R2', 'TBE16JUL07.R2', 'TBE29OCT07.R2']
-otuTable = otuTable.drop(excludeList, axis=1)
-
 # Compute counts to relative abundances
 avgRelAbundTable = otuTable / otuTable.sum(axis=0)
 
