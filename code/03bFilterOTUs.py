@@ -6,11 +6,7 @@
 # URL: http://http://mcmahonlab.wisc.edu/
 # All rights reserved.
 ################################################################################
-# Given a BIOM table of unique sequences abundances:
-#   Rarefy all samples to a given depth
-#   Compute relatibe abundances
-#   Discard all sequences which aren't present at a specific abundance
-# These relative abundance tables serve as the basis for modeling
+# Given a set of filtering criterion, create a simplified OTU table
 ################################################################################
 
 #%%#############################################################################
@@ -39,8 +35,8 @@ relAbundTable = otuTable / otuTable.sum(axis=0)
 
 #%%#############################################################################
 ### Taken together, the previous analyses suggest that a relative abundance
-### threshold of  0.001 will capture > 90% of the total sequences. Around 10% 
-### of all sequence variants account for this 90%.
+### threshold of  0.001 will capture > 90% of the total sequences and a
+### persistence threshold of 0.7 will capture > 80% of the sequences.
 ###
 ### Let's simplify the OTU table and write to file
 ################################################################################
@@ -56,6 +52,15 @@ simpleOtuTable = simpleOtuTable.loc[~(simpleOtuTable==0).all(axis=1)]
 simpleRelAbundTable = relAbundTable.copy()
 simpleRelAbundTable[simpleRelAbundTable < 0.001] = 0
 simpleRelAbundTable = simpleRelAbundTable.loc[~(simpleRelAbundTable==0).all(axis=1)]
+
+## Further filter based on persistence
+simpleOtuTable['Persistence'] = simpleOtuTable.astype(bool).sum(axis=1) / len(simpleOtuTable.columns)
+simpleOtuTable = simpleOtuTable[simpleOtuTable.Persistence < 0.7]
+simpleOtuTable = simpleOtuTable.drop('Persistence', axis=1)
+
+simpleRelAbundTable['Persistence'] = simpleRelAbundTable.astype(bool).sum(axis=1) / len(simpleRelAbundTable.columns)
+simpleRelAbundTable = simpleRelAbundTable[simpleRelAbundTable.Persistence > 0.7]
+simpleRelAbundTable = simpleRelAbundTable.drop('Persistence', axis=1)
 
 # Write to file
 simpleOtuTable.to_csv(deblurDir+'/simpleOtuTable.csv')
@@ -88,6 +93,11 @@ avgRelAbundTable.columns = sampleNames
 simpleAvgRelAbundTable = avgRelAbundTable.copy()
 simpleAvgRelAbundTable[simpleAvgRelAbundTable < 0.001] = 0
 simpleAvgRelAbundTable = simpleAvgRelAbundTable.loc[~(simpleAvgRelAbundTable==0).all(axis=1)]
+
+## Further filter based on persistence
+simpleAvgRelAbundTable['Persistence'] = simpleAvgRelAbundTable.astype(bool).sum(axis=1) / len(simpleAvgRelAbundTable.columns)
+simpleAvgRelAbundTable = simpleAvgRelAbundTable[simpleAvgRelAbundTable.Persistence > 0.7]
+simpleAvgRelAbundTable = simpleAvgRelAbundTable.drop('Persistence', axis=1)
 
 # Write to file
 simpleAvgRelAbundTable.to_csv(deblurDir+'/simpleAvgRelAbundTable.csv')
