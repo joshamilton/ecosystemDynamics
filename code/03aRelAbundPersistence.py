@@ -6,20 +6,17 @@
 # URL: http://http://mcmahonlab.wisc.edu/
 # All rights reserved.
 ################################################################################
-# Given a BIOM table of unique sequences abundances:
-#   Rarefy all samples to a given depth
-#   Compute relatibe abundances
-#   Discard all sequences which aren't present at a specific abundance
-# These relative abundance tables serve as the basis for modeling
+# Given a set of filtering criterion, create a simplified OTU table
 ################################################################################
 
 #%%#############################################################################
 ### Import packages
 ################################################################################
 
-import numpy as np
 import math
+import matplotlib.cm as cm
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import re
 
@@ -30,33 +27,16 @@ import re
 deblurDir = '../results/deblur' # BIOM file from deblurring
 
 #%%#############################################################################
-#### Import otu table and visualize distribution of relative abundances
-#################################################################################
+### Import otu table and calculate average relative abundances
+################################################################################
 
 # Import table
 otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
 
-# Compute counts to relative abundances
+# Convert counts to relative abundances
 relAbundTable = otuTable / otuTable.sum(axis=0)
 
-# Convert to a single series and remove 0 values
-relAbundSeries = relAbundTable.unstack()
-relAbundSeries = relAbundSeries[relAbundSeries!=0]
-
-# Convert to log10 and plot a histogram with integer bin size
-logRelAbundSeries = np.log10(relAbundSeries)
-plt.figure(0)
-plt.hist(logRelAbundSeries, bins = range(math.floor(logRelAbundSeries.min()), math.ceil(logRelAbundSeries.max())+1), normed=True)
-plt.xlabel('Log10 relative abundance of OTU')
-plt.ylabel('% Total OTUs')
-plt.savefig(deblurDir+'/Total OTUs vs. Abundance.png')
-
-#%%#############################################################################
-### Now let's do the same but with the average of sample replicates
-################################################################################
-
-# Import table and sort
-otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
+# Convert to a table of average relative abundances
 otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
 
 # Compute counts to relative abundances
@@ -70,213 +50,118 @@ sampleNames = list(otuTable.columns[::2])
 sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
 avgRelAbundTable.columns = sampleNames
 
-# Convert to a single series and remove 0 values
-avgRelAbundSeries = avgRelAbundTable.unstack()
-avgRelAbundSeries = avgRelAbundSeries[avgRelAbundSeries!=0]
-
-# Convert to log10 and plot a histogram with integer bin size
-logAvgRelAbundSeries = np.log10(avgRelAbundSeries)
-plt.figure(1)
-plt.hist(logAvgRelAbundSeries, bins = range(math.floor(logAvgRelAbundSeries.min()), math.ceil(logAvgRelAbundSeries.max())+1), normed=True)
-plt.xlabel('Log10 average relative abundance of OTU')
-plt.ylabel('% Total OTUs')
-plt.savefig(deblurDir+'/Total OTUs vs. Average Abundance.png')
-
 #%%#############################################################################
-### Now let's plot the fraction of total abundance in each bin
+### Consider a range of relative abundances and persistences
+### For each pairing, calculate the % of total sequences retained, as well as
+### the minimum % retained across all samples
+### Construct a 3-D plot of these data to help choose cutoffs
 ################################################################################
 
-# Create a dataframe showing the % total abundance accounted for by each OTU in each sample
+abundRange = list(np.logspace(-8, 0, 17, base=10))
+persistRange = list(range(0, 105, 5))
+persistRange = [persist / 100 for persist in persistRange]
 
-logRelAbundSeriesTable  = pd.DataFrame(data=0, index=logRelAbundSeries.index, columns=['Log Rel Abund', 'Total Seqs'])
-logRelAbundSeriesTable['Log Rel Abund'] = logRelAbundSeries
-logRelAbundSeriesTable['Total Seqs'] = otuTable.unstack()
-logRelAbundSeriesTable['% Total Seqs'] = logRelAbundSeriesTable['Total Seqs'] / logRelAbundSeriesTable['Total Seqs'].sum(axis=0)
+#abundPersistIndex = pd.MultiIndex.from_product([abundRange, persistRange], names=['Abundance', 'Persistence'])
+recoveryTable = pd.DataFrame(0, index=abundRange, columns=persistRange)
+worstTable = pd.DataFrame(0, index=abundRange, columns=persistRange)
+totalOtuTable = pd.DataFrame(0, index=abundRange, columns=persistRange)
+log10TotalOtuTable = pd.DataFrame(0, index=abundRange, columns=persistRange)
 
-# Use these data do calculate the fraction of sequences within each relative abundance window
-histTotalSeqDF = pd.DataFrame(data=0, index = range(math.floor(logRelAbundSeries.min()), math.ceil(logRelAbundSeries.max())), columns=['% Total Seqs'])
+# Loop over all combinations
+# For each, filter the dataset based first on abundance, then persistence
 
-for floor in histTotalSeqDF.index:
-    histTotalSeqDF.loc[floor] = logRelAbundSeriesTable[(logRelAbundSeriesTable['Log Rel Abund'] >= floor) & (logRelAbundSeriesTable['Log Rel Abund'] < floor+1)]['% Total Seqs'].sum()
+for abund in abundRange:
+    for persist in persistRange:
 
-# Plot as a bar chart
-plt.figure(2)
-plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge')
-plt.xlabel('Log10 relative abundance of OTU')
-plt.ylabel('% Total Sequences')
-plt.savefig(deblurDir+'/Total Sequences vs. Abundance.png')
-
-#%%#############################################################################
-### And the same but again with sample replicates
-################################################################################
-
-# First create a dataframe giving the total number of sequences in each set of replicates
-summedOtuTable = otuTable.groupby(np.arange(len(otuTable.columns))//2, axis=1).sum()
-sampleNames = list(otuTable.columns[::2])
-sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
-summedOtuTable.columns = sampleNames
-
-# Create a dataframe showing the % total abundance accounted for by each OTU in each sample
-logAvgRelAbundSeriesTable  = pd.DataFrame(data=0, index=logAvgRelAbundSeries.index, columns=['Log Rel Abund', 'Total Seqs'])
-logAvgRelAbundSeriesTable['Log Rel Abund'] = logAvgRelAbundSeries
-logAvgRelAbundSeriesTable['Total Seqs'] = summedOtuTable.unstack()
-logAvgRelAbundSeriesTable['% Total Seqs'] = logAvgRelAbundSeriesTable['Total Seqs'] / logAvgRelAbundSeriesTable['Total Seqs'].sum(axis=0)
-
-# Use these data do calculate the fraction of sequences within each relative abundance window
-histTotalSeqDF = pd.DataFrame(data=0, index = range(math.floor(logAvgRelAbundSeries.min()), math.ceil(logAvgRelAbundSeries.max())), columns=['% Total Seqs'])
-
-for floor in histTotalSeqDF.index:
-    histTotalSeqDF.loc[floor] = logAvgRelAbundSeriesTable[(logAvgRelAbundSeriesTable['Log Rel Abund'] >= floor) & (logAvgRelAbundSeriesTable['Log Rel Abund'] < floor+1)]['% Total Seqs'].sum()
-
-# Plot as a bar chart
-plt.figure(3)
-plt.bar(histTotalSeqDF.index, histTotalSeqDF['% Total Seqs'], align='edge')
-plt.xlabel('Log10 average relative abundance of OTU')
-plt.ylabel('% Total Sequences')
-plt.savefig(deblurDir+'/Total Sequences vs. Average Abundance.png')
+        # Make a copy of master OTU table
+        simpleAvgRelAbundTable = avgRelAbundTable.copy()
+        
+        # Filter on abundance
+        simpleAvgRelAbundTable[simpleAvgRelAbundTable < abund] = 0
+        simpleAvgRelAbundTable = simpleAvgRelAbundTable.loc[~(simpleAvgRelAbundTable==0).all(axis=1)]
+        
+        # Filter on persistence
+        simpleAvgRelAbundTable['Persistence'] = simpleAvgRelAbundTable.astype(bool).sum(axis=1) / len(simpleAvgRelAbundTable.columns)
+        simpleAvgRelAbundTable = simpleAvgRelAbundTable[simpleAvgRelAbundTable.Persistence > persist]
+        simpleAvgRelAbundTable = simpleAvgRelAbundTable.drop('Persistence', axis=1)
+        
+        # Update survival data frame
+        recoveryTable.loc[abund, persist] = simpleAvgRelAbundTable.sum().sum() / len(simpleAvgRelAbundTable.columns)
+        worstTable.loc[abund, persist] = simpleAvgRelAbundTable.sum(axis=0).min()
+        totalOtuTable.loc[abund, persist] = len(simpleAvgRelAbundTable.index)
+        log10TotalOtuTable.loc[abund, persist] = np.log10(len(simpleAvgRelAbundTable.index))
+        
+# Write to file
+recoveryTable.to_csv(deblurDir+'/persistAbund-TotalRecovery.csv')
+worstTable.to_csv(deblurDir+'/persistAbund-WorstRecovery.csv')
+totalOtuTable.to_csv(deblurDir+'/persistAbund-TotalOTUs.csv')
 
 #%%#############################################################################
-#### Import otu table and visualize distribution of persistence
+### Visualize with contour plots
 ################################################################################
 
-# Define a function to obtain a list of fractions
-def frange(start, stop, step):
-    i = start
-    while i < stop:
-        yield i
-        i += step
+xRange = list(np.logspace(-8, 0, 9, base=10)) # steps for x axis. Use persist range for y axis.
 
-# Import table
-otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
+plt.figure(0) # create the figure
+plt.figure(figsize=(11,8.5))
+plt.subplots_adjust(hspace=0.25)
 
-# Compute persistence
-otuTable['Persistence'] = otuTable.astype(bool).sum(axis=1) / len(otuTable.columns)
+### Fraction of sequence retained
+plt.subplot(221) # first subplot
+X, Y = np.meshgrid(recoveryTable.index, recoveryTable.columns)
+CS = plt.contourf(X, Y, recoveryTable.values.transpose(), levels=persistRange, cmap=cm.gray)
+plt.xscale('log') # log scale
+plt.xticks(xRange) # ticks every order of magnitude
+plt.yticks(persistRange) # ticks every 0.05
+plt.title('Fraction Sequences Retained')
+plt.xlabel('Relative Abundance')
+plt.ylabel('Persistence')
+# make a colorbar for the contour lines
+cbar = plt.colorbar(CS, ticks=persistRange)
 
-## Plot a histogram with integer bin size
-plt.figure(4)
-# Assign weights to the sum of all bins equals one
-# Necessary b/c bins are of width < 1
-# See https://stackoverflow.com/questions/3866520/plotting-histograms-whose-bar-heights-sum-to-1-in-matplotlib/16399202#16399202)
-weights = np.ones_like(otuTable['Persistence'])/float(len(otuTable['Persistence']))
 
-plt.hist(otuTable['Persistence'], bins=list(frange(0, 1, 0.1)), weights=weights)
-plt.xlabel('Persistence')
-plt.ylabel('Fraction of OTUs')
-plt.savefig(deblurDir+'/Total OTUs vs. Persistence.png')
+### Worst case retained
+plt.subplot(222) # second subplot
+X, Y = np.meshgrid(worstTable.index, worstTable.columns)
+CS = plt.contourf(X, Y, worstTable.values.transpose(), levels=persistRange, cmap=cm.gray)
+plt.xscale('log') # log scale
+plt.xticks(xRange) # ticks every order of magnitude
+plt.yticks(persistRange) # ticks every 0.05
+plt.title('Frac. Seq. Retained (Worst)')
+plt.xlabel('Relative Abundance')
+plt.ylabel('Persistence')
+# make a colorbar for the contour lines
+cbar = plt.colorbar(CS, ticks=persistRange)
 
-#%%#############################################################################
-#### Repeat for average of replicates
-################################################################################
-# Import table and sort
-otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
-otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
 
-# Compute counts to relative abundances
-avgRelAbundTable = otuTable / otuTable.sum(axis=0)
+### Fraction of OTUs retained
+fracOtuTable = np.log10(totalOtuTable / len(otuTable.index))
+cmapRange = list(range(math.floor(fracOtuTable[fracOtuTable != fracOtuTable.loc[1, 0]].min().min()), 1, 1))
+plt.subplot(223) # third subplot
+X, Y = np.meshgrid(fracOtuTable.index, fracOtuTable.columns)
+CS = plt.contourf(X, Y, fracOtuTable.values.transpose(), levels=cmapRange, cmap=cm.gray)
+plt.xscale('log') # log scale
+plt.xticks(xRange) # ticks every order of magnitude
+plt.yticks(persistRange) # ticks every 0.05
+plt.title('Fraction Remaining OTUs')
+plt.xlabel('Relative Abundance')
+plt.ylabel('Persistence')
+# make a colorbar for the contour lines
+cbar = plt.colorbar(CS, ticks=cmapRange)
 
-# Compute average for each sample (every 2 columns)
-avgRelAbundTable = avgRelAbundTable.groupby(np.arange(len(avgRelAbundTable.columns))//2, axis=1).mean()
 
-# Retrive the list of sample names and remove the '.R2'
-sampleNames = list(otuTable.columns[::2])
-sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
-avgRelAbundTable.columns = sampleNames
+### Total OTUs remaining
+yRange = list(range(0, math.ceil(np.log10(len(otuTable.index)))+1)) # log scale
+plt.subplot(224) # fourth subplot
+X, Y = np.meshgrid(log10TotalOtuTable.index, log10TotalOtuTable.columns)
+CS = plt.contourf(X, Y, log10TotalOtuTable.values.transpose(), levels=yRange, cmap=cm.gray)
+plt.xscale('log') # log scale
+plt.xticks(xRange) # ticks every order of magnitude
+plt.yticks(persistRange) # ticks every 0.05
+plt.title('Log10 Remaining OTUs')
+plt.xlabel('Relative Abundance')
+plt.ylabel('Persistence')
+# make a colorbar for the contour lines
+cbar = plt.colorbar(CS, ticks=yRange)
 
-# Compute persistence
-avgRelAbundTable['Persistence'] = avgRelAbundTable.astype(bool).sum(axis=1) / len(avgRelAbundTable.columns)
-
-## Plot a histogram with integer bin size
-plt.figure(5)
-# Assign weights to the sum of all bins equals one
-# Necessary b/c bins are of width < 1
-# See https://stackoverflow.com/questions/3866520/plotting-histograms-whose-bar-heights-sum-to-1-in-matplotlib/16399202#16399202)
-weights = np.ones_like(avgRelAbundTable['Persistence'])/float(len(avgRelAbundTable['Persistence']))
-
-plt.hist(avgRelAbundTable['Persistence'], bins=list(frange(0, 1, 0.1)), weights=weights)
-plt.xlabel('Average Persistence of Replicates')
-plt.ylabel('Fraction of OTUs')
-plt.savefig(deblurDir+'/Total OTUs vs. Average Persistence.png')
-
-#%%#############################################################################
-### Import otu table and visualize fraction ot total sequences in each
-### persistence bin
-################################################################################
-
-# Define a function to obtain a list of fractions
-def frange(start, stop, step):
-    i = start
-    while i < stop:
-        yield i
-        i += step
-
-# Import table
-otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
-
-# Compute total seqs and persistence
-otuTable['Total Seqs'] = otuTable.sum(axis=1)
-otuTable['Rel Abund'] = otuTable['Total Seqs'] / otuTable['Total Seqs'].sum()
-otuTable['Persistence'] = otuTable.astype(bool).sum(axis=1) / len(otuTable.columns)
-
-# Create a dataframe showing the % total abundance accounted for by each OTU in each sample
-# Use these data do calculate the fraction of sequences within each relative abundance window
-histPersistDF = pd.DataFrame(data=0, index = list(frange(0, 1, 0.05)), columns=['Rel Abund'])
-
-for floor in histPersistDF.index:
-    histPersistDF.loc[floor] = otuTable[(otuTable['Persistence'] >= floor) & (otuTable['Persistence'] < floor+0.05)]['Rel Abund'].sum()
-
-# Plot as a bar chart
-plt.figure(6)
-plt.bar(histPersistDF.index, histPersistDF['Rel Abund'], align='edge')
-plt.xlim([0, 1])
-plt.xlabel('Persistence')
-plt.ylabel('% Total Sequences')
-plt.savefig(deblurDir+'/Total Sequences vs. Persistence.png')
-
-#%%#############################################################################
-### Repeat for average of each replicate
-################################################################################
-
-# Define a function to obtain a list of fractions
-def frange(start, stop, step):
-    i = start
-    while i < stop:
-        yield i
-        i += step
-
-# Import table and sort
-otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
-otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
-
-# Compute counts to relative abundances
-avgRelAbundTable = otuTable / otuTable.sum(axis=0)
-
-# Compute average for each sample (every 2 columns)
-avgRelAbundTable = avgRelAbundTable.groupby(np.arange(len(avgRelAbundTable.columns))//2, axis=1).mean()
-
-# Retrive the list of sample names and remove the '.R2'
-sampleNames = list(otuTable.columns[::2])
-sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
-avgRelAbundTable.columns = sampleNames
-    
-# Compute relative abundance and persistence
-relAbundSeries = avgRelAbundTable.sum(axis=1) / avgRelAbundTable.sum(axis=1).sum()
-persistSeries = avgRelAbundTable.astype(bool).sum(axis=1) / len(avgRelAbundTable.columns)
-
-# Add to DF
-avgRelAbundTable['Rel Abund'] = relAbundSeries
-avgRelAbundTable['Persistence'] = persistSeries
-    
-# Create a dataframe showing the % total abundance accounted for by each OTU in each sample
-# Use these data do calculate the fraction of sequences within each relative abundance window
-histAvgPersistDF = pd.DataFrame(data=0, index = list(frange(0, 1, 0.05)), columns=['Rel Abund'])
-
-for floor in histAvgPersistDF.index:
-    histAvgPersistDF.loc[floor] = avgRelAbundTable[(avgRelAbundTable['Persistence'] >= floor) & (avgRelAbundTable['Persistence'] < floor+0.05)]['Rel Abund'].sum()
-
-# Plot as a bar chart
-plt.figure(7)
-plt.bar(histPersistDF.index, histPersistDF['Rel Abund'], align='edge')
-plt.xlim([0, 1])
-plt.xlabel('Persistence of Averaged Replicates')
-plt.ylabel('% Total Sequences')
-plt.savefig(deblurDir+'/Total Sequences vs. Average Persistence.png')
+plt.savefig(deblurDir+'/Filter on Persist and Rel Abund.png')
