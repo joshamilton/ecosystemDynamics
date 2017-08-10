@@ -13,6 +13,7 @@
 ### Import packages
 ################################################################################
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import re
@@ -72,3 +73,21 @@ simpleAvgRelAbundTable = simpleAvgRelAbundTable.drop('Persistence', axis=1)
 
 # Write to file
 simpleAvgRelAbundTable.to_csv(deblurDir+'/simpleAvgRelAbundTable.csv')
+
+#%%#############################################################################
+### Check mean-variance scaling
+################################################################################
+
+meanSeries = np.log10(simpleAvgRelAbundTable.mean(axis=1))
+varianceSeries = np.log10(simpleAvgRelAbundTable.var(axis=1))
+
+plt.figure(0) # create the figure
+plt.scatter(meanSeries, varianceSeries)
+plt.xlabel('Mean log10(OTU)')
+plt.ylabel('Variance log10(OTU)')
+
+# Find the best-fit line and add to the plot
+slope, intercept = np.polyfit(meanSeries, varianceSeries, 1)
+plt.plot(meanSeries, slope*meanSeries + intercept, 'r')
+
+plt.savefig('Mean-Variance Scaling.png')
