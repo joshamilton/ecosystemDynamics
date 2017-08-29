@@ -25,19 +25,12 @@ import subprocess
 ################################################################################
 
 qcDir = '../data/demultiplexedAndQCd' # demultiplexed and QCd fasta files
-excludeDir = '../results/qc'
 outputDir = '../results/deblur'
 
 minLength = 150 # trim sequences to this length
 
 if not os.path.exists(outputDir):
     os.makedirs(outputDir)
-
-# Read in samples to exclude
-excludeList = []
-with open(excludeDir+'/excludeMe.csv', 'r') as inFile:
-    excludeList = inFile.readlines()
-excludeList = [sample.strip() for sample in excludeList]
 
 #%%#############################################################################
 ### Call deblur
@@ -74,7 +67,6 @@ index = [str(seqInt).zfill(6) for seqInt in index] # Convert to strings of equal
 otuDF['IndexCol'] = index
 otuDF.index = otuDF['IndexCol'] 
 otuDF = otuDF.drop(labels=['#OTU ID', 'IndexCol'], axis =1)
-otuDF = otuDF.drop(labels=excludeList, axis =1)
 otuDF.to_csv(outputDir+'/otuTable.csv')
 os.remove(outputDir+'/otuTable.tsv')
 
