@@ -24,14 +24,14 @@ import re
 ### Define folder structure
 ################################################################################
 
-deblurDir = '../results/deblur' # BIOM file from deblurring
+deblurDir = '../results/deblur'
 
 #%%#############################################################################
 ### Import otu table and calculate average relative abundances
 ################################################################################
 
 # Import table
-otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
+otuTable = pd.read_csv(deblurDir+'/epiOtuTable.csv', sep=',', index_col=0)
 
 # Convert counts to relative abundances
 relAbundTable = otuTable / otuTable.sum(axis=0)
@@ -45,10 +45,12 @@ avgRelAbundTable = otuTable / otuTable.sum(axis=0)
 # Compute average for each sample (every 2 columns)
 avgRelAbundTable = avgRelAbundTable.groupby(np.arange(len(avgRelAbundTable.columns))//2, axis=1).mean()
 
-# Retrive the list of sample names and remove the '.R2'
+# Retrieve the list of sample names and remove the '.R2'
 sampleNames = list(otuTable.columns[::2])
 sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
 avgRelAbundTable.columns = sampleNames
+
+avgRelAbundTable.to_csv(deblurDir+'/epiRelAbundTable.csv')
 
 #%%#############################################################################
 ### Consider a range of relative abundances and persistences
@@ -92,9 +94,9 @@ for abund in abundRange:
         log10TotalOtuTable.loc[abund, persist] = np.log10(len(simpleAvgRelAbundTable.index))
         
 # Write to file
-recoveryTable.to_csv(deblurDir+'/persistAbund-TotalRecovery.csv')
-worstTable.to_csv(deblurDir+'/persistAbund-WorstRecovery.csv')
-totalOtuTable.to_csv(deblurDir+'/persistAbund-TotalOTUs.csv')
+recoveryTable.to_csv(deblurDir+'/persistAbund-TotalRecovery-epi.csv')
+worstTable.to_csv(deblurDir+'/persistAbund-WorstRecovery-epi.csv')
+totalOtuTable.to_csv(deblurDir+'/persistAbund-TotalOTUs-epi.csv')
 
 #%%#############################################################################
 ### Visualize with contour plots
@@ -164,4 +166,4 @@ plt.ylabel('Persistence')
 # make a colorbar for the contour lines
 cbar = plt.colorbar(CS, ticks=yRange)
 
-plt.savefig(deblurDir+'/Filter on Persist and Rel Abund.png')
+plt.savefig(deblurDir+'/persistAbund-epi.png')

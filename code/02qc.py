@@ -38,7 +38,7 @@ if not os.path.exists(outputDir):
 # Read in the otuTable and count total number of sequences per sample
 otuTable = pd.read_csv(deblurDir+'/otuTable.csv', index_col=0)
 
-# Creat a new series with total sequence counts and write to file
+# Create a new series with total sequence counts and write to file
 seqCountSeries = otuTable.sum()
 seqCountSeries.to_csv(outputDir+'/numSeqPerSample.csv')
 
@@ -69,7 +69,7 @@ with open(outputDir+'/excludeMe.csv', 'w') as outFile:
 
 otuTable = otuTable.drop(excludeList, axis=1)
 otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
-otuTable.to_csv(deblurDir+'/otuTable.csv', index=False)
+otuTable.to_csv(deblurDir+'/otuTable.csv')
 
 #%%#############################################################################
 ### Split otutable by layer - epi and hypo
@@ -92,5 +92,5 @@ epiOtuTable = epiOtuTable.loc[~(epiOtuTable==0).all(axis=1)]
 hypoOtuTable = hypoOtuTable.loc[~(hypoOtuTable==0).all(axis=1)]
 
 # Write to file
-epiOtuTable.to_csv(deblurDir+'/epiOtuTable.csv', index=False)
-hypoOtuTable.to_csv(deblurDir+'/hypoOtuTable.csv', index=False)
+epiOtuTable.to_csv(deblurDir+'/epiOtuTable.csv')
+hypoOtuTable.to_csv(deblurDir+'/hypoOtuTable.csv')
