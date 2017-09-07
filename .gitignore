@@ -1,2 +1,15 @@
 # Folders to ignore
 data/*
+
+# Large files
+results/deblur/all.biom
+results/deblur/all.seqs.fa
+results/deblur/all.seqs.numIDs.fasta
+results/deblur/epiOtuTable.csv
+results/deblur/epiRelAbundTable.csv
+results/deblur/hypoOtuTable.csv
+results/deblur/otuTable.csv
+results/deblur/reference-hit.biom
+results/deblur/reference-hit.seqs.fa
+results/deblur/reference-non-hit.biom
+results/deblur/reference-non-hit.seqs.fa
