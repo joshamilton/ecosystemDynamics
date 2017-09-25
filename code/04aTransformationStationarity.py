@@ -17,7 +17,9 @@ from datetime import datetime
 import matplotlib.pyplot as plt
 import os
 import mannKendall as mk
+import numpy as np
 import pandas as pd
+import re
 import statsmodels.tsa.stattools as sts
 
 #%%#############################################################################
@@ -33,38 +35,73 @@ if not os.path.exists(resultsDir):
 sampleList = ['TBE07', 'TBE08']
 
 #%%#############################################################################
-### Import renormalized otu table. Filter based on persistence and abundance, 
-### and create dummy OTU.
+### Import otu table and calculate average relative abundances
 ################################################################################
 
 # Import table
-otuTable = pd.read_csv(deblurDir+'/simpleAvgRelAbundTable-renorm.csv', sep=',', index_col=0)
+otuTable = pd.read_csv(deblurDir+'/otuTable.csv', sep=',', index_col=0)
+
+# Convert counts to relative abundances
+relAbundTable = otuTable / otuTable.sum(axis=0)
+
+# Convert to a table of average relative abundances
+otuTable = otuTable.reindex_axis(sorted(otuTable.columns), axis=1)
+
+# Compute counts to relative abundances
+avgRelAbundTable = otuTable / otuTable.sum(axis=0)
+
+# Compute average for each sample (every 2 columns)
+avgRelAbundTable = avgRelAbundTable.groupby(np.arange(len(avgRelAbundTable.columns))//2, axis=1).mean()
+
+# Retrive the list of sample names and remove the '.R2'
+sampleNames = list(otuTable.columns[::2])
+sampleNames = [re.sub('.R1', '', sample) for sample in sampleNames]
+avgRelAbundTable.columns = sampleNames
+
+#%%#############################################################################
+### Filter based on persistence, abundance, and max. abundance
+### Create dummy OTU
+################################################################################
 
 # Filter table based on persistence, and create a dummy OTU to represent the 
 # remaining sequences
+zero = 0.001
 persist = 0.15
-abund = 0.1
-otuTable['Persistence'] = otuTable.astype(bool).sum(axis=1) / len(otuTable.columns)
-otuTable = otuTable[(otuTable.Persistence > persist) | (otuTable.drop('Persistence', axis=1).max(axis=1) > abund)]
-otuTable = otuTable.drop('Persistence', axis=1)
+abund = 0.003
+bloom = 0.1
+
+# Filter on zero threshold - when performing log transformations, these values
+# will be replaced with non-zeros from a proper distribution
+#avgRelAbundTable[avgRelAbundTable < zero] = 0
+
+# Calculate max abundance
+avgRelAbundTable['Bloom'] = avgRelAbundTable.max(axis=1)
+
+# Calculate persistence (based on abundance)
+avgRelAbundTable['Persistence'] = (avgRelAbundTable.drop(['Bloom'], axis=1) > abund).sum(axis=1) / len(avgRelAbundTable.drop(['Bloom'], axis=1).columns)
+
+# Filter on either of these criteria
+avgRelAbundTable = avgRelAbundTable[(avgRelAbundTable.Persistence > persist) | (avgRelAbundTable.Bloom > bloom)]
+avgRelAbundTable = avgRelAbundTable.drop('Persistence', axis=1)
+avgRelAbundTable = avgRelAbundTable.drop('Bloom', axis=1)
 
 # Add a dummy OTU containing the remaining sequences
 # This operation reindexes the dataframe, so retain original mapping
 mapDict = {}
 curIter = 0
-for otu in otuTable.index:
+for otu in avgRelAbundTable.index:
     mapDict[curIter] = otu
     curIter += 1
-otuTable = otuTable.append(1 - otuTable.sum(), ignore_index=True)
+avgRelAbundTable = avgRelAbundTable.append(1 - avgRelAbundTable.sum(), ignore_index=True)
 mapDict[len(mapDict)] = 'Other'
 
 # Then restore the original index
-indexList = otuTable.index
+indexList = avgRelAbundTable.index
 indexList = [mapDict[index] for index in indexList]
-otuTable.index = indexList
+avgRelAbundTable.index = indexList
 
 # Write to file
-otuTable.to_csv(deblurDir+'/simpleAvgRelAbundTable-renorm-filterPersistAbund.csv')
+avgRelAbundTable.to_csv(deblurDir+'/simpleOtuTable.csv')
 
 #%%#############################################################################
 ### We're doing a time-series analysis, need to split otuTable into separate
@@ -79,7 +116,7 @@ otuTableDict = {}
 for sample in sampleList:
     lake = sample[0:3]
     year = sample[3:5]
-    tempOtuTable = otuTable.filter(regex=(lake+'\d{2}[A-Z]{3}'+year))
+    tempOtuTable = avgRelAbundTable.filter(regex=(lake+'\d{2}[A-Z]{3}'+year))
 
     timeDF = pd.DataFrame(0, index=tempOtuTable.columns, columns=['Date', 'Time'])
     

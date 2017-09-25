@@ -14,8 +14,6 @@
 ################################################################################
 
 import copy
-import math
-import matplotlib.cm as cm
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -26,7 +24,7 @@ import statsmodels.stats.diagnostic as smd
 ### Define folder structure
 ################################################################################
 
-deblurDir = '../results/deblur' # BIOM file from deblurring
+deblurDir = '../results/deblur'
 
 #%%#############################################################################
 ### Import otu table and calculate average relative abundances
@@ -120,6 +118,7 @@ for cutoff in cutoffList:
     plt.ylabel('Residual')
     fileName = 'Residuals of Mean-Variance Scaling-'+str(cutoff)+'.png'
     plt.savefig(deblurDir+'/'+fileName)
+    plt.close()
     
     lm, lm_pvalue, fvalue, f_pvalue = smd.het_breuschpagan(fitDF['Residual'], fitDF['Mean'].to_frame())
     
