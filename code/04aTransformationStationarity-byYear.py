@@ -15,11 +15,14 @@
 
 from datetime import datetime
 import matplotlib.pyplot as plt
-import os
+import math
 import mannKendall as mk
 import numpy as np
+import os
 import pandas as pd
 import re
+import scipy.stats as ss
+import skbio.stats.composition as ssm
 import statsmodels.tsa.stattools as sts
 
 #%%#############################################################################
@@ -70,10 +73,6 @@ persist = 0.15
 abund = 0.003
 bloom = 0.1
 
-# Filter on zero threshold - when performing log transformations, these values
-# will be replaced with non-zeros from a proper distribution
-#avgRelAbundTable[avgRelAbundTable < zero] = 0
-
 # Calculate max abundance
 avgRelAbundTable['Bloom'] = avgRelAbundTable.max(axis=1)
 
@@ -99,6 +98,19 @@ mapDict[len(mapDict)] = 'Other'
 indexList = avgRelAbundTable.index
 indexList = [mapDict[index] for index in indexList]
 avgRelAbundTable.index = indexList
+
+## Finally, replace zeros with small values
+# Filter on zero threshold - when performing log transformations, these values
+# will be replaced with non-zeros from a proper distribution
+avgRelAbundTable[avgRelAbundTable < zero] = 0
+# Multiplicative replacement destroys the dataframe, so before performing the
+# operation, capture the index and columns
+indexList = avgRelAbundTable.index
+columnList = avgRelAbundTable.columns
+# Replacment
+avgRelAbundTable = (ssm.multiplicative_replacement(avgRelAbundTable.T, delta=0.00065)).T
+# Restore the dataframe
+avgRelAbundTable = pd.DataFrame(avgRelAbundTable, index=indexList, columns=columnList)
 
 # Write to file
 avgRelAbundTable.to_csv(deblurDir+'/simpleOtuTable.csv')
@@ -142,7 +154,6 @@ for sample in sampleList:
 
 #%%#############################################################################
 ### Construct the time-series for each OTU and plot it
-### Perform statistical tests of stationarity for each time-series
 ################################################################################
 
 for sample in sampleList:
@@ -150,12 +161,40 @@ for sample in sampleList:
     for curOtu in tempOtuTable.index:
         
         plt.figure(curOtu)
-        plt.plot(tempOtuTable.loc[curOtu])
+        plt.plot(np.log(tempOtuTable.loc[curOtu]))
         plt.xlabel('Time')
         plt.ylabel('Relative Abundance')
         plt.savefig(resultsDir+'/'+str(curOtu)+'-'+sample+'.png')
         plt.close()
+    
+#%%#############################################################################
+### Construct a histogram of the relative abundance data
+################################################################################
 
+for sample in sampleList:
+    tempOtuTable = otuTableDict[sample]
+    for curOtu in tempOtuTable.index:
+
+        # Compute the time-series
+        timeSeries = np.log(tempOtuTable.loc[curOtu])
+        
+        # Construct a histogram
+        ## Specify number of bins using Freedman-Diaconis rule
+        ## https://en.wikipedia.org/wiki/Freedman%E2%80%93Diaconis_rule
+        binSize = 2 * ss.iqr(timeSeries) / len(timeSeries)**(1/3)
+        numBins = np.ceil((timeSeries.max() - timeSeries.min()) / binSize)
+        if numBins == np.inf or math.isnan(numBins):
+            numBins = 10  
+        numBins = int(numBins)
+
+        plt.figure()
+        plt.show()
+        n, bins, patches = plt.hist(timeSeries, numBins)
+        plt.xlabel('Relative Abundance')
+        plt.ylabel('Count')
+        plt.savefig(resultsDir+'/'+str(curOtu)+'-'+sample+'-Hist.png')        
+        plt.close()
+        
 #%%#############################################################################
 ### Perform tests of stationarity on each time-series
 ### This requires interpolating between time-points
@@ -164,37 +203,36 @@ for sample in sampleList:
 ### Interpolation: Linear, Quadratic, Cubic, etc
 ### Stationarity: ADF, KPSS
 ################################################################################
-# Test samples TBE07 OTUs 1 and 4
 
-interpList = ['linear', 'slinear', 'quadratic', 'cubic', 'krogh', 'pchip']
+# Skip 'quadratic', 'cubic', and 'krogh' interp b/c their non-monotonic and result in negative OTU values
+interpList = ['linear', 'slinear', 'pchip']
 testList = ['KM-Trend', 'ADF-Mean', 'ADF-Trend', 'KPSS-Mean', 'KPSS-Trend']
-otuList = otuTable.index[0:10]
 
-for sample in sampleList:
+# Create the data frame to store results (p-values from stat tests)
+# Index is all (sample, otu) pairs. Columns are all statistical tests pairs
+otuList = avgRelAbundTable.index
+multiIndex = pd.MultiIndex.from_product([sampleList, otuList])
+resultsDF = pd.DataFrame(0.0, index=multiIndex, columns=testList)
 
-    # Create the otu table with missing values
-    otuTable = otuTableDict[sample]
-    otuTable = otuTable.reindex(columns=list(range(otuTable.columns[0], otuTable.columns[-1]+1, 1)))
+for interp in interpList:    
+    for sample in sampleList:
 
-    for interp in interpList:
+        # Create the otu table with missing values
+        otuTable = otuTableDict[sample]
+        otuTable = otuTable.reindex(columns=list(range(otuTable.columns[0], otuTable.columns[-1]+1, 1)))
+        otuList = otuTable.index
+
         # Interpolate within the otu table
         otuTable = otuTable.interpolate(method=interp, axis=1)
-        
-        # Create the data frame to store results (p-values from stat tests)
-        # Index is all (sample, otu) pairs. Columns are all statistical tests pairs
-        multiIndex = pd.MultiIndex.from_product([sampleList, otuList])
-        resultsDF = pd.DataFrame(0.0, index=multiIndex, columns=testList)
-        
+                
         for otu in otuList:
-            # Extract the time-series of interest
-            timeSeries = otuTable.loc[otu]
+            # Extract the time-series of interest and log-transform
+            timeSeries = np.log(otuTable.loc[otu])
         
             # Perform statistical tests
-
             # Mann-Kendall test: presence of a trend
             # Unavailable in Python, use function defined here
             # http://michaelpaulschramm.com/simple-time-series-trend-analysis/
-            
             [trend, h, p, z] = mk.mk_test(timeSeries, alpha=0.05)
             resultsDF.set_value((sample, otu), 'KM-Trend', p)
             
@@ -214,4 +252,4 @@ for sample in sampleList:
             [kpss, pval, lags, crit] = sts.kpss(timeSeries, regression='ct', lags=None, store=False)
             resultsDF.set_value((sample, otu), 'KPSS-Trend', kpss)
         
-        resultsDF.to_csv(resultsDir+'/trend-stationarity-'+interp+'Interp.csv')
+    resultsDF.to_csv(resultsDir+'/trend-stationarity-'+interp+'Interp.csv')
