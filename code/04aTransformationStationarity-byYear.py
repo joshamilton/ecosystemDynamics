@@ -205,7 +205,7 @@ for sample in sampleList:
 ################################################################################
 
 # Skip 'quadratic', 'cubic', and 'krogh' interp b/c their non-monotonic and result in negative OTU values
-interpList = ['linear', 'slinear', 'pchip']
+interpList = ['linear', 'slinear', 'pchip', 'pad', 'ignore']
 testList = ['KM-Trend', 'ADF-Mean', 'ADF-Trend', 'KPSS-Mean', 'KPSS-Trend']
 
 # Create the data frame to store results (p-values from stat tests)
@@ -223,7 +223,13 @@ for interp in interpList:
         otuList = otuTable.index
 
         # Interpolate within the otu table
-        otuTable = otuTable.interpolate(method=interp, axis=1)
+        if interp == 'pad': # fill with most recent value
+            otuTable = otuTable.fillna(method='pad', axis=1)
+        elif interp == 'ignore': # dorp all 'nan' columns
+            otuTable = otuTable.dropna(axis=1)
+            otuTable.columns = list(range(0, len(otuTable.columns)))
+        else: # otherwise interpolate usign the specified method
+            otuTable = otuTable.interpolate(method=interp, axis=1)
                 
         for otu in otuList:
             # Extract the time-series of interest and log-transform
