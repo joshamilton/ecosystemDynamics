@@ -1,2 +1,4 @@
 # Folders to ignore
-data/*
+data
+results/stationarity
+code/__pycache__
