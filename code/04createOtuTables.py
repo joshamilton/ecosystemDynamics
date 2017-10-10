@@ -152,7 +152,7 @@ logOtuTable = pd.DataFrame(logOtuTable, index=indexList, columns=columnList)
 logOtuTable.to_csv(forecastDir+'/simpleOtuTable-sorted-NoZeros.csv')
 
 # Compute log relative abundance and write to file
-logOtuTable = np.log(logOtuTable)
+logOtuTable = np.log10(logOtuTable)
 logOtuTable.to_csv(forecastDir+'/simpleOtuTable-sorted-NoZeros-Log.csv')
 
 #%%#############################################################################
@@ -212,5 +212,5 @@ for sample in sampleList:
     tempOtuTable.to_csv(forecastDir+'/simpleOtuTable-'+sample+'-sorted-NoZeros.csv')
     
     # Compute log relative abundance and write to file
-    tempOtuTable = np.log(tempOtuTable)
+    tempOtuTable = np.log10(tempOtuTable)
     tempOtuTable.to_csv(forecastDir+'/simpleOtuTable-'+sample+'-sorted-NoZeros-Log.csv')
