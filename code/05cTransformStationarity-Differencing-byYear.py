@@ -62,7 +62,8 @@ for interp in interpList:
 
         # Create the otu table with missing values
         otuTable = pd.read_csv(forecastDir+'/simpleOtuTable-'+sample+'-sorted-NoZeros-Log.csv', index_col=0)
-        otuTable.columns = otuTable.columns.astype(int)        
+        otuTable.columns = otuTable.columns.astype(int)       
+        otuTable = otuTable.reindex(columns=list(range(otuTable.columns[0], otuTable.columns[-1]+1, 1)))
         otuList = otuTable.index
 
         # Interpolate within the otu table
